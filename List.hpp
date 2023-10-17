@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstddef>
 #include <stdexcept>
 #include <functional>
@@ -9,7 +10,7 @@ struct ListNode {
     ListNode *prev = nullptr;
     T data;
 
-    ListNode(T data){
+    ListNode(T data) {
         this->data = data;
     }
 };
@@ -22,71 +23,107 @@ private:
     size_t size = 0;
 public:
     void push_back(T data);
+
     void push_front(T data);
+
     void pop_back();
+
     void pop_front();
+
     void remove(size_t ind);
+
+    /// @return count of removed items
+    size_t remove_if(std::function<bool(const T &)> compr);
+
+    /// @return 1 if element was found and removed. 0 otherwise.
+    bool remove_one_if(std::function<bool(const T &)> compr);
+
     void insert(size_t ind, T data);
+
     void replace(size_t ind, T data);
-    void foreach(std::function<void(T&)> lambda);
-    T& find(std::function<bool(T&)> comp_lambda) const;
-    T& at(size_t ind) const;
+
+    void clear();
+
+    void foreach(std::function<void(T &)> lambda) const;
+
+    T *find(std::function<bool(const T &)> compr) const;
+
+    T &at(size_t ind) const;
+
+    T &operator[](size_t ind) const;
 
     ~List();
+
 private:
-    ListNode<T> *node_at(size_t ind);
+    void remove_node(ListNode<T> *node);
+
+    ListNode<T> *node_at(size_t ind) const;
+
     inline void _push_back_or_front(T data, bool front);
+
     inline void _pop_back_or_front(bool front);
 };
 
 template<class T>
-List<T>::~List() {
+void List<T>::clear() {
     ListNode<T> *node = head;
     ListNode<T> *next = nullptr;
-    while(node){
+    while (node) {
         next = node->next;
         delete node;
         node = next;
     }
+    head = tail = nullptr;
+    size = 0;
 }
 
 template<class T>
-void List<T>::foreach(std::function<void(T&)> lambda) {
-    ListNode<T> * node = head;
-    while(node){
+List<T>::~List() {
+    this->clear();
+}
+
+template<class T>
+void List<T>::foreach(std::function<void(T &)> lambda) const {
+    ListNode<T> *node = head;
+    while (node) {
         lambda(node->data);
         node = node->next;
     }
 }
 
 template<class T>
-ListNode<T> *List<T>::node_at(size_t ind) {
-    if(ind >= size)
-        throw std::runtime_error("Index out-of-bounds");
+ListNode<T> *List<T>::node_at(size_t ind) const {
+    if (ind >= size) return nullptr;
 
-    ListNode<T> *node = head;
-    for(size_t i = 0; i < ind; i++){
-        node = node->next;
+    ListNode<T> *node = nullptr;
+
+    if (size - ind > ind) {
+        node = head;
+        for (size_t i = 0; i < ind; i++) {
+            node = node->next;
+        }
+        return node;
+    } else {
+        node = tail;
+        for (size_t i = size - 1; i > ind; i--) {
+            node = node->prev;
+        }
+        return node;
     }
-    return node;
+    throw std::runtime_error("Corrupted list");
 }
 
 template<class T>
 void List<T>::replace(size_t ind, T data) {
-    if(head == nullptr) throw std::runtime_error("List is empty");
+    if (head == nullptr) throw std::runtime_error("List is empty");
 
-    try {
-        ListNode<T> *node = this->node_at(ind);
-        node->data = data;
-    } catch (const std::exception& e){
-        throw e;
-    }
+    ListNode<T> *node = this->node_at(ind);
+    node->data = data;
 }
 
 template<class T>
 void List<T>::insert(size_t ind, T data) {
-    if(head == nullptr) throw std::runtime_error("List is empty");
-    try {
+    if (head == nullptr) throw std::runtime_error("List is empty");
         ListNode<T> *next_node = this->node_at(ind);
         ListNode<T> *prev_node = next_node->prev;
         ListNode<T> *new_node = new ListNode<T>(data);
@@ -94,55 +131,77 @@ void List<T>::insert(size_t ind, T data) {
         new_node->prev = prev_node;
         new_node->next = next_node;
 
-        if(!prev_node){
+        if (!prev_node) {
             head = new_node;
         } else {
             prev_node->next = new_node;
         }
         next_node->prev = new_node;
 
-    } catch (const std::exception& e){
-        throw e;
-    }
     size++;
 }
 
 template<class T>
 void List<T>::remove(size_t ind) {
-    if(head == nullptr) throw std::runtime_error("List is empty");
+    if (head == nullptr) return;
 
-    try {
-        ListNode<T> *node = this->node_at(ind);
-        ListNode<T> *prev = node->prev;
-        ListNode<T> *next = node->next;
+    ListNode<T> *node = this->node_at(ind);
+    ListNode<T> *prev = node->prev;
+    ListNode<T> *next = node->next;
 
-        if(head == node) head = next;
-        if(tail == node) tail = prev;
+    if (next) next->prev = prev;
+    else tail = prev;
 
-        if(next) next->prev = prev;
-        if(prev) prev->next = next;
-        delete node;
+    if (prev) prev->next = next;
+    else head = next;
 
-        size--;
-    } catch (const std::exception& e){
-        throw e;
-    }
+    delete node;
+
+    size--;
 }
 
 template<class T>
-inline void List<T>::_push_back_or_front(T data, bool front){
+size_t List<T>::remove_if(std::function<bool(const T &)> compr) {
+    ListNode<T> *node = head;
+    size_t rn = 0;
+    while (node) {
+        if (compr(node->data)) {
+            ListNode<T> *next = node->next;
+            this->remove_node(node);
+            node = next;
+            rn++;
+        } else node = node->next;
+    }
+    return rn;
+}
+
+template<class T>
+bool List<T>::remove_one_if(std::function<bool(const T &)> compr) {
+    ListNode<T> *node = head;
+    while (node) {
+        if (compr(node->data)) {
+            this->remove_node(node);
+            return true;
+        }
+        node = node->head;
+    }
+    return false;
+}
+
+template<class T>
+inline void List<T>::_push_back_or_front(T data, bool front) {
     auto *new_node = new ListNode<T>(data);
 
     if (head == nullptr) {
         head = tail = new_node;
     } else {
-        if(!front) {
+        if (!front) {
             new_node->prev = tail;
             tail->next = new_node;
             tail = new_node;
         } else {
             new_node->next = head;
-            head->next = new_node;
+            head->prev = new_node;
             head = new_node;
         }
     }
@@ -150,11 +209,11 @@ inline void List<T>::_push_back_or_front(T data, bool front){
 }
 
 template<class T>
-inline void List<T>::_pop_back_or_front(bool front){
+inline void List<T>::_pop_back_or_front(bool front) {
     if (head == nullptr)
         return;
 
-    if(head == tail){
+    if (head == tail) {
         delete head;
         tail = head = nullptr;
     } else if (front) {
@@ -170,12 +229,12 @@ inline void List<T>::_pop_back_or_front(bool front){
 }
 
 template<class T>
-void List<T>::push_back(T data){
+void List<T>::push_back(T data) {
     _push_back_or_front(data, false);
 }
 
 template<class T>
-void List<T>::push_front(T data){
+void List<T>::push_front(T data) {
     _push_back_or_front(data, true);
 }
 
@@ -190,24 +249,40 @@ void List<T>::pop_front() {
 }
 
 template<class T>
-T& List<T>::at(size_t ind) const {
-    if(ind >= size)
-        throw std::runtime_error("Index out-of-bounds");
-
-    ListNode<T> *node = head;
-    for(size_t i = 0; i < ind; i++){
-        node = node->next;
-    }
+T &List<T>::at(size_t ind) const {
+    auto node = node_at(ind);
+    if (!node) throw std::runtime_error("index out-of-bounds");
     return node->data;
 }
 
 template<class T>
-T& List<T>::find(std::function<bool(T&)> lambda) const {
+T &List<T>::operator[](size_t ind) const {
+    return this->at(ind);
+}
+
+template<class T>
+T *List<T>::find(std::function<bool(const T &)> compr) const {
     ListNode<T> *node = head;
-    while(node){
-        if(lambda(node->data))
-            return node->data;
+    while (node) {
+        if (compr(node->data))
+            return &node->data;
         node = node->next;
     }
-    throw std::runtime_error("Not found");
+    return nullptr;
+}
+
+template<class T>
+void List<T>::remove_node(ListNode<T> *node) {
+    if (size == 0) return;
+
+    ListNode<T> next_node = node->next;
+    ListNode<T> prev_node = node->prev;
+
+    if (next_node) next_node->prev = prev_node;
+    else tail = prev_node;
+
+    if (prev_node) prev_node->next = next_node;
+    else head = next_node;
+
+    size--;
 }
