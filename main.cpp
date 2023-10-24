@@ -1,35 +1,97 @@
 #include <iostream>
 #include <string>
 #include "linked_list.hpp"
+#include <chrono>
+#include <ctime>
+#include <random>
 
 struct Data {
     std::string name;
     int age;
 
-    bool operator<(const Data &other) const {
-        if (age != other.age)
-            return age < other.age;
-        return name < other.name;
-    }
+    bool operator<(const Data &other) const;
 
-    bool operator>(const Data &other) const {
-        if (age != other.age)
-            return age > other.age;
-        return name > other.name;
-    }
+    bool operator>(const Data &other) const;
 
-    bool operator==(const Data &other) const {
-        return age == other.age && name == other.name;
-    }
+    bool operator==(const Data &other) const;
 };
 
-std::ostream &operator<<(std::ostream &os, const Data obj) {
-    os << "{name: \"" << obj.name << "\", age: " << obj.age << "}";
-    return os;
+std::ostream &operator<<(std::ostream &os, const Data obj);
+
+static void print_list(const linked_list<Data> &list);
+
+std::string test_result_text(bool result) {
+    return std::string("\t\t test result: ") + (result ? "passed" : "failed");
 }
 
+void list_unit_tests();
 
-static void print_list(const linked_list<Data> &list) {
+template<typename I>
+I get_rand_int(I min, I max){
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+
+    std::uniform_int_distribution<I> dist(min, max);
+    return dist(gen);
+}
+
+int main() {
+    const auto start_clock = std::clock();
+
+    std::cout << " ==== Unit tests ==== " << std::endl;
+    list_unit_tests();
+
+    auto test_end_clock = std::clock();
+    auto duration = 1000 * (double)(test_end_clock - start_clock) / CLOCKS_PER_SEC;
+    std::cout << "\nUnit tests CPU time: " << duration << "ms" << std::endl;
+
+    std::cout << "\n==== Performance test ====" << std::endl;
+    const auto perf_start_clock = std::clock();
+
+    // Add test
+    linked_list<Data> list;
+    const size_t add_n = 10000;
+    for(size_t i = 0; i < add_n; i++){
+        std::string str = "xxxxxx";
+        Data dat;
+        for(char & c : str){
+            c = get_rand_int<char>('a', 'z');
+        }
+        dat.age = get_rand_int<int>(0, 120);
+        list.push_back(dat);
+    }
+
+    duration = 1000 * (double)(std::clock() - perf_start_clock) / CLOCKS_PER_SEC;
+    std::cout << add_n << " elements added to list. CPU Time: " << duration << "ms\n";
+    std::cout << list.to_string() << std::endl;
+
+    // Find and remove test
+    const size_t remove_n = 10000;
+    size_t rem_cnt = 0;
+    auto rem_clock = std::clock();
+    for(size_t i = 0; i < remove_n / 2; i++){
+        std::string str = "xxxxxx";
+        Data dat;
+
+        for(char & c : str){
+            c = get_rand_int<char>('a', 'z');
+        }
+        dat.age = get_rand_int<int>(0, 120);
+        rem_cnt += list.remove_one_if([&](const Data& data){
+            return data > dat;
+        });
+    }
+
+    duration = 1000 * (double)(std::clock() - rem_clock) / CLOCKS_PER_SEC;
+    std::cout << "find and remove test. " << rem_cnt << " items removed. CPU time: " << duration << "ms\n";
+    std::cout << list.to_string() << std::endl;
+
+
+
+    return 0;
+}
+
+void print_list(const linked_list<Data> &list) {
     std::cout << list.to_string() << std::endl;
     int i = 0;
     list.foreach([&i](Data &os) {
@@ -37,11 +99,12 @@ static void print_list(const linked_list<Data> &list) {
     });
 }
 
-std::string test_result_text(bool result) {
-    return std::string("\t\t test result: ") + (result ? "passed" : "failed");
+std::ostream &operator<<(std::ostream &os, const Data obj) {
+    os << "{name: \"" << obj.name << "\", age: " << obj.age << "}";
+    return os;
 }
 
-void list_unit_tests(){
+void list_unit_tests() {
     //  === Unit tests ===
     Data testData;
     linked_list<Data> list;
@@ -139,9 +202,18 @@ void list_unit_tests(){
 
 }
 
-int main() {
-    std::cout << " ==== Unit tests ==== " << std::endl;
-    list_unit_tests();
+bool Data::operator<(const Data &other) const {
+    if (age != other.age)
+        return age < other.age;
+    return name < other.name;
+}
 
-    return 0;
+bool Data::operator>(const Data &other) const {
+    if (age != other.age)
+        return age > other.age;
+    return name > other.name;
+}
+
+bool Data::operator==(const Data &other) const {
+    return age == other.age && name == other.name;
 }
